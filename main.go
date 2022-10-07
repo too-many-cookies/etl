@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql" // Side effects
@@ -38,13 +39,27 @@ func insert(db *sql.DB, loginAttempts []LoginAttempt) { // Routine
 	}
 } // End insert
 
-func main() {
-	loginAttempts := []LoginAttempt{ // Test slice of structs to simulate logins
-		{Username: "err4471", Timestamp: "2022-10-05", Success: false},
-		{Username: "err4471", Timestamp: "2022-10-05", Success: true},
-		{Username: "err4471", Timestamp: "2022-10-05", Success: true},
+func readLines(path string) {
+	file, err := os.Open(path) // Open syslog
+	if err != nil {            // Log errors opening
+		log.Println(err.Error())
 	}
+	defer func(file *os.File) { // Close syslog when finished
+		err := file.Close()
+		if err != nil {
+		}
+	}(file)
 
+	//var lines []string
+	scanner := bufio.NewScanner(file) // Create new scanner to read syslog
+
+	for scanner.Scan() { // Read log line by line
+		text := scanner.Text()
+		fmt.Println(text)
+	}
+} // End readLines
+
+func main() {
 	db, err := sql.Open("mysql", databaseURI()) // Open database connection
 
 	if err != nil { // Log failed connections
@@ -60,11 +75,13 @@ func main() {
 	c := cron.New() // Instantiate cron
 
 	_, err = c.AddFunc("@every 5s", func() { // Schedule insert
-		go insert(db, loginAttempts) // Add insert routine
+		//go insert(db, loginAttempts) // Add insert routine
 	})
 	if err != nil { // Handle errors scheduling the jobs
 		log.Fatal("Failed to add jobs.")
 	}
+
+	readLines("syslog")
 
 	c.Start() // Start scheduled jobs
 
