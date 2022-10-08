@@ -91,7 +91,7 @@ func main() {
 	db, err := sql.Open("mysql", databaseURI()) // Open database connection
 
 	if err != nil { // Log failed connections
-		panic("Unable to establish database connection.")
+		log.Fatal("Unable to establish database connection.")
 	}
 	defer func(db *sql.DB) { // Handle disconnection at end of session
 		err := db.Close()
