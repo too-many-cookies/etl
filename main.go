@@ -8,6 +8,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"log"
 	"os"
+	"strings"
 )
 
 var ( // Get database info from ENV
@@ -50,17 +51,27 @@ func readLines(path string) {
 		}
 	}(file)
 
-	//var lines []string
 	scanner := bufio.NewScanner(file) // Create new scanner to read syslog
 
 	for scanner.Scan() { // Read log line by line
 		text := scanner.Text()
-		fmt.Println(text)
+		if strings.Contains(text, "Failed") {
+			fmt.Println("Failed" + text)
+		} else if strings.Contains(text, "session opened") {
+			fmt.Println("Success" + text)
+		}
+		//	TODO: clean data and add to structs (maybe slice of structs?)
 	}
 } // End readLines
 
 func main() {
 	db, err := sql.Open("mysql", databaseURI()) // Open database connection
+
+	loginAttempts := []LoginAttempt{ // Test slice of structs to simulate logins
+		{Username: "err4471", Timestamp: "2022-10-05", Success: false},
+		{Username: "err4471", Timestamp: "2022-10-05", Success: true},
+		{Username: "err4471", Timestamp: "2022-10-05", Success: true},
+	} // TODO: Clean this up and create proper test data
 
 	if err != nil { // Log failed connections
 		panic("Unable to establish database connection.")
@@ -75,13 +86,13 @@ func main() {
 	c := cron.New() // Instantiate cron
 
 	_, err = c.AddFunc("@every 5s", func() { // Schedule insert
-		//go insert(db, loginAttempts) // Add insert routine
+		go readLines("syslog")
+		go insert(db, loginAttempts) // Add insert routine
+		//	TODO Create chanel to hand login structs to insert routine
 	})
 	if err != nil { // Handle errors scheduling the jobs
 		log.Fatal("Failed to add jobs.")
 	}
-
-	readLines("syslog")
 
 	c.Start() // Start scheduled jobs
 
