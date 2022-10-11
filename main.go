@@ -36,9 +36,8 @@ func databaseURI() string { // Create connection string from ENV
 		os.Getenv("DB_NAME"))
 }
 
-func ingest(ch chan LoginAttempt) {
-	logPath := os.Getenv("LOG_PATH")
-	file, err := os.Open(logPath) // Open logfile
+func ingest(logfile string, ch chan LoginAttempt) {
+	file, err := os.Open(logfile) // Open logfile
 	if err != nil {               // Log errors opening
 		log.Println(err.Error())
 	}
@@ -94,12 +93,14 @@ func main() {
 		}
 	}(db)
 
+	logfile := os.Getenv("LOG_PATH") // Get logfile path from ENV
+
 	c := cron.New() // Instantiate cron
 
-	_, err = c.AddFunc("@every 5s", func() { // Schedule insert
+	_, err = c.AddFunc("@every 5s", func() { // Schedule jobs
 		ch := make(chan LoginAttempt)
-		go ingest(ch)     // Add ingest routine
-		go insert(db, ch) // Add insert routine
+		go ingest(logfile, ch) // Add ingest routine
+		go insert(db, ch)      // Add insert routine
 		log.Println("[ETL] Jobs started")
 	})
 	if err != nil { // Handle errors scheduling the jobs
