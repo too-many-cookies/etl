@@ -28,8 +28,8 @@ func TestDatabaseURI(t *testing.T) {
 }
 
 func TestGenerateTimestamp(t *testing.T) {
-	want := fmt.Sprintf("%d-05-04 01:30:00", time.Now().Year())
-	msg := generateTimestamp("May", "04", "01:30:00") // Check result is of current year
+	want := fmt.Sprintf("%d-05-04 01:30:00", time.Now().Year()) // Check result is of current year
+	msg := generateTimestamp("May", "04", "01:30:00")
 	if msg != want {
 		t.Fatal()
 	}
