@@ -12,14 +12,6 @@ import (
 	"time"
 )
 
-var ( // Get database info from ENV
-	username = os.Getenv("DB_USER")
-	password = os.Getenv("DB_PASS")
-	hostname = os.Getenv("DB_HOST")
-	database = os.Getenv("DB_NAME")
-	logfile  = os.Getenv("LOG_NAME")
-)
-
 type LoginAttempt struct { // Struct to store login attempts from syslog
 	Username  string `json:"username"`
 	Timestamp string `json:"timestamp"`
@@ -27,8 +19,6 @@ type LoginAttempt struct { // Struct to store login attempts from syslog
 }
 
 func insert(db *sql.DB, ch chan LoginAttempt) { // Routine
-	log.Println("[Job 1] Run")
-
 	for attempt := range ch { // Insert login attempts from slice of structs
 		q := "INSERT INTO logs (username, timestamp, successful) VALUES (?, ?, ?)"  // Create prepared statement
 		_, err := db.Query(q, attempt.Username, attempt.Timestamp, attempt.Success) // Insert with values from struct
@@ -38,13 +28,17 @@ func insert(db *sql.DB, ch chan LoginAttempt) { // Routine
 	}
 } // End insert
 
-func databaseURI() string { // Create connection string
-	return fmt.Sprintf("%s:%s@tcp(%s)/%s", username, password, hostname, database)
+func databaseURI() string { // Create connection string from ENV
+	return fmt.Sprintf("%s:%s@tcp(%s)/%s",
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASS"),
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_NAME"))
 }
 
-func ingest(path string, ch chan LoginAttempt) {
-	file, err := os.Open(path) // Open logfile
-	if err != nil {            // Log errors opening
+func ingest(logfile string, ch chan LoginAttempt) {
+	file, err := os.Open(logfile) // Open logfile
+	if err != nil {               // Log errors opening
 		log.Println(err.Error())
 	}
 	defer func(file *os.File) { // Close syslog when finished
@@ -85,12 +79,11 @@ func generateTimestamp(month string, day string, clock string) string {
 		"Jul": "07", "Aug": "08", "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12",
 	}
 	return fmt.Sprintf("%d-%s-%s %s", year, m[month], day, clock) // Format and return string
-} // End ingest
+} // End generateTimestamp
 
 func main() {
 	db, err := sql.Open("mysql", databaseURI()) // Open database connection
-
-	if err != nil { // Log failed connections
+	if err != nil {                             // Log failed connections
 		log.Fatal("Unable to establish database connection.")
 	}
 	defer func(db *sql.DB) { // Handle disconnection at end of session
@@ -100,12 +93,15 @@ func main() {
 		}
 	}(db)
 
+	logfile := os.Getenv("LOG_PATH") // Get logfile path from ENV
+
 	c := cron.New() // Instantiate cron
 
-	_, err = c.AddFunc("@every 5s", func() { // Schedule insert
+	_, err = c.AddFunc("@every 5s", func() { // Schedule jobs
 		ch := make(chan LoginAttempt)
 		go ingest(logfile, ch) // Add ingest routine
 		go insert(db, ch)      // Add insert routine
+		log.Println("[ETL] Jobs started")
 	})
 	if err != nil { // Handle errors scheduling the jobs
 		log.Fatal("Failed to add jobs.")
