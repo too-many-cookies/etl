@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql" // Side effects
-	"github.com/robfig/cron/v3"
 	"log"
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql" // Side effects
+	"github.com/robfig/cron/v3"
 )
 
 type LoginAttempt struct { // Struct to store login attempts from syslog
@@ -70,6 +71,7 @@ func ingest(logfile string, ch chan LoginAttempt) {
 		}
 	}
 	close(ch) // Close channel when no attempts remain
+	os.Remove(logfile)
 }
 
 func generateTimestamp(month string, day string, clock string) string {
@@ -97,7 +99,7 @@ func main() {
 
 	c := cron.New() // Instantiate cron
 
-	_, err = c.AddFunc("@every 5s", func() { // Schedule jobs
+	_, err = c.AddFunc("0 4 * * *", func() { // Schedule jobs nightly
 		ch := make(chan LoginAttempt)
 		go ingest(logfile, ch) // Add ingest routine
 		go insert(db, ch)      // Add insert routine
@@ -109,7 +111,7 @@ func main() {
 
 	c.Start() // Start scheduled jobs
 
-	_, err = fmt.Scanln() // Run jobs until keypress
+	_, err = fmt.Scanln() // Run jobs until key press
 	if err != nil {
 		return
 	}
